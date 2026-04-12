@@ -6,13 +6,8 @@ from sqlalchemy.orm import sessionmaker
 app = Flask(__name__)
 CORS(app)
 
-<<<<<<< HEAD
 #Conexión a PostgreSQL
 import os
-=======
-import os
-
->>>>>>> 93db0a7 (fix update army bug)
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if not DATABASE_URL:
