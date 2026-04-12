@@ -6,10 +6,19 @@ from sqlalchemy.orm import sessionmaker
 app = Flask(__name__)
 CORS(app)
 
+<<<<<<< HEAD
 #Conexión a PostgreSQL
 import os
+=======
+import os
+
+>>>>>>> 93db0a7 (fix update army bug)
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql://postgres:postgres123@localhost:5432/medieval2_db"
+
+# ESTA LÍNEA DE ABAJO NO SÉ SI SOBRA
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 
@@ -186,6 +195,7 @@ def delete_army(id):
 @app.route("/units/<int:id>", methods=["PUT"])
 def update_unit(id):
     data = request.json
+
     session = Session()
     session.execute(
         text("UPDATE units SET color = :color WHERE id = :id"),
@@ -260,7 +270,8 @@ def update_army(id):
             SET name = :name,
                 mission = :mission,
                 notes = :notes
-                    """),
+            WHERE id = :id
+        """),
         {
             "name": data.get("name"),
             "mission": data.get("mission"),
