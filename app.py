@@ -7,8 +7,8 @@ app = Flask(__name__)
 CORS(app)
 
 #Conexión a PostgreSQL
-DATABASE_URL = "postgresql://neondb_owner:npg_mFHUB10iOkLG@ep-divine-mountain-al1jybx7-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-
+import os
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
