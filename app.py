@@ -81,6 +81,9 @@ def create_army():
         notes = data.get("notes")
         user_id = data.get("user_id")
 
+        if not user_id:
+            return jsonify({"error": "user_id requerido"}), 400
+
         result = session.execute(
             text("""
                 INSERT INTO armies (name, mission, notes, user_id)
@@ -138,6 +141,9 @@ def create_unit():
     color = data.get("color")
     army_id = data.get("army_id")
     user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "user_id requerido"}), 400
 
     if not type_ or not color or not army_id or not user_id:
         return jsonify({"error": "faltan datos"}), 400
@@ -222,6 +228,9 @@ def update_unit(id):
     data = request.json
     user_id = data.get("user_id")
 
+    if not user_id:
+        return jsonify({"error": "user_id requerido"}), 400
+
     with get_session() as session:
         session.execute(
             text("""UPDATE units 
@@ -302,6 +311,9 @@ def update_army(id):
     data = request.json
     user_id = data.get("user_id")
 
+    if not user_id:
+        return jsonify({"error": "user_id requerido"}), 400
+
     with get_session() as session:
         session.execute(
             text("""
@@ -353,6 +365,10 @@ def get_map_units():
 @app.route("/map-units", methods=["POST"])
 def save_map_unit():
     data = request.json
+    user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "user_id requerido"}), 400
 
     with get_session() as session:
 
@@ -377,6 +393,9 @@ def save_map_unit():
 def update_map_unit(id): 
     data = request.json
     user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "user_id requerido"}), 400
 
     with get_session() as session:
 
