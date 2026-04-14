@@ -3,6 +3,8 @@ from flask_cors import CORS
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
+from dotenv import load_dotenv
+load_dotenv()
 
 # PARA CERRAR LAS PUTAS SESIONES Y QUE NO SE SATURE LA BD
 @contextmanager
@@ -15,7 +17,11 @@ def get_session():
         session.close()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[
+    "http://localhost:5173",
+    "https://medieval2manager.com",
+    "https://www.medieval2manager.com"
+])
 
 #Conexión a PostgreSQL
 import os
@@ -48,8 +54,12 @@ def home():
 @app.route("/armies")
 def get_armies():
      with get_session() as session:
+        user_id = request.args.get("user_id")
 
-        result = session.execute(text("SELECT * FROM armies"))
+        result = session.execute(
+            text("SELECT * FROM armies WHERE user_id = :user_id"),
+            {"user_id": user_id}
+        )
 
         armies = []
         for row in result:
@@ -69,31 +79,34 @@ def create_army():
         name = data.get("name")
         mission = data.get("mission")
         notes = data.get("notes")
+        user_id = data.get("user_id")
 
         result = session.execute(
             text("""
-                INSERT INTO armies (name, mission, notes)
-                VALUES (:name, :mission, :notes)
+                INSERT INTO armies (name, mission, notes, user_id)
+                VALUES (:name, :mission, :notes, :user_id)
                 RETURNING id
             """),
             {
                 "name": name,
                 "mission": mission,
-                "notes": notes
+                "notes": notes,
+                "user_id": user_id
             }
         )
         army_id = result.scalar()
 
         result_unit = session.execute(
             text("""
-                INSERT INTO units (type, color, army_id)
-                VALUES (:type, :color, :army_id)
+                INSERT INTO units (type, color, army_id, user_id)
+                VALUES (:type, :color, :army_id, :user_id)
                 RETURNING id
             """),
             {
                 "type": "General",
                 "color": "verde",
-                "army_id": army_id
+                "army_id": army_id,
+                "user_id": user_id
             }
         )
         general_id = result_unit.scalar()
@@ -124,22 +137,24 @@ def create_unit():
     type_ = data.get("type")
     color = data.get("color")
     army_id = data.get("army_id")
+    user_id = data.get("user_id")
 
-    if not type_ or not color or not army_id:
+    if not type_ or not color or not army_id or not user_id:
         return jsonify({"error": "faltan datos"}), 400
 
     with get_session() as session:
 
         result = session.execute(
             text("""
-                INSERT INTO units (type, color, army_id)
-                VALUES (:type, :color, :army_id)
+                INSERT INTO units (type, color, army_id, user_id)
+                VALUES (:type, :color, :army_id, :user_id)
                 RETURNING id
             """),
             {
                 "type": type_,
                 "color": color,
-                "army_id": army_id
+                "army_id": army_id,
+                "user_id": user_id
             }
         )
 
@@ -148,13 +163,14 @@ def create_unit():
         return jsonify({
             "id": new_id,
             "type": type_,
-            "color": color
+            "color": color,
         })
 
 
 # DELETE UNITS
 @app.route("/units/<int:id>", methods=["DELETE"])
 def delete_unit(id):
+    
     with get_session() as session:
 
         # 🔍 comprobar tipo de unidad
@@ -167,10 +183,11 @@ def delete_unit(id):
         if unit and unit.type == "General":
             return jsonify({"error": "No se puede eliminar el General"}), 400
 
+        user_id = request.args.get("user_id")
         # 🗑️ si no, borrar
         session.execute(
-            text("DELETE FROM units WHERE id = :id"),
-            {"id": id}
+            text("DELETE FROM units WHERE id = :id AND user_id = :user_id"),
+            {"id": id, "user_id": user_id}
         )
 
         return jsonify({"message": "Unidad eliminada"})
@@ -179,18 +196,18 @@ def delete_unit(id):
 # DELETE EJÉRCITOS
 @app.route("/armies/<int:id>", methods=["DELETE"])
 def delete_army(id):
+    user_id = request.args.get("user_id")  # 👈 AÑADIR
+
     with get_session() as session:
 
-        # borrar unidades primero
         session.execute(
-            text("DELETE FROM units WHERE army_id = :id"),
-            {"id": id}
+            text("DELETE FROM units WHERE army_id = :id AND user_id = :user_id"),
+            {"id": id, "user_id": user_id}
         )
 
-        # borrar ejército
         session.execute(
-            text("DELETE FROM armies WHERE id = :id"),
-            {"id": id}
+            text("DELETE FROM armies WHERE id = :id AND user_id = :user_id"),
+            {"id": id, "user_id": user_id}
         )
 
         return jsonify({"message": "Ejército eliminado"})
@@ -203,11 +220,17 @@ def delete_army(id):
 @app.route("/units/<int:id>", methods=["PUT"])
 def update_unit(id):
     data = request.json
+    user_id = data.get("user_id")
 
     with get_session() as session:
         session.execute(
-            text("UPDATE units SET color = :color WHERE id = :id"),
-            {"color": data.get("color"), "id": id}
+            text("""UPDATE units 
+            SET color = :color 
+            WHERE id = :id AND user_id = :user_id"""),
+            {
+            "color": data.get("color"),
+            "id": id,
+            "user_id": user_id}
         )
         return jsonify({"message": "Color actualizado"})
 
@@ -215,10 +238,13 @@ def update_unit(id):
 
 @app.route("/armies-with-units")
 def get_armies_with_units():
-    
+
+    user_id = request.args.get("user_id")
+
     with get_session() as session:
         print("🔥 Endpoint llamado")
-        result = session.execute(text("""
+        result = session.execute(
+            text("""
             SELECT 
                 armies.id AS army_id,
                 armies.name AS army_name, 
@@ -228,8 +254,12 @@ def get_armies_with_units():
                 units.type,
                 units.color
             FROM armies
-            LEFT JOIN units ON units.army_id = armies.id;
-    """))
+            LEFT JOIN units 
+            ON units.army_id = armies.id 
+            AND units.user_id = :user_id
+            WHERE armies.user_id = :user_id
+            """),
+            {"user_id": user_id})
         
         armies = {}
 
@@ -268,7 +298,9 @@ def test_db():
 # CUADROS DE MISION Y NOTAS
 @app.route("/armies/<int:id>", methods=["PUT"])
 def update_army(id):
+    
     data = request.json
+    user_id = data.get("user_id")
 
     with get_session() as session:
         session.execute(
@@ -277,13 +309,14 @@ def update_army(id):
                 SET name = :name,
                     mission = :mission,
                     notes = :notes
-                WHERE id = :id
+                WHERE id = :id AND user_id = :user_id
             """),
             {
                 "name": data.get("name"),
                 "mission": data.get("mission"),
                 "notes": data.get("notes"),
-                "id": id
+                "id": id,
+                "user_id": user_id
             }
         )
 
@@ -292,11 +325,18 @@ def update_army(id):
 #GET POSICIONES EN EL MAPA
 @app.route("/map-units")
 def get_map_units():
+
+    user_id = request.args.get("user_id")  # 👈 AÑADIR
+
     with get_session() as session:
 
-        result = session.execute(text("""
-            SELECT * FROM map_units
-        """))
+        result = session.execute(
+            text("""
+                SELECT * FROM map_units
+                WHERE user_id = :user_id
+            """),
+            {"user_id": user_id}
+        )
 
         units = []
         for row in result:
@@ -318,8 +358,8 @@ def save_map_unit():
 
         result = session.execute(
             text("""
-                INSERT INTO map_units (army_id, x, y)
-                VALUES (:army_id, :x, :y)
+                INSERT INTO map_units (army_id, x, y, user_id)
+                VALUES (:army_id, :x, :y, :user_id)
                 RETURNING id
             """),
             data
@@ -334,8 +374,9 @@ def save_map_unit():
 
 # PUT DE UNIDADES EN MAPA
 @app.route("/map-units/<int:id>", methods=["PUT"])
-def update_map_unit(id):
+def update_map_unit(id): 
     data = request.json
+    user_id = data.get("user_id")
 
     with get_session() as session:
 
@@ -343,12 +384,13 @@ def update_map_unit(id):
             text("""
                 UPDATE map_units
                 SET x = :x, y = :y
-                WHERE id = :id
+                WHERE id = :id AND user_id = :user_id
             """),
             {
                 "x": data.get("x"),
                 "y": data.get("y"),
-                "id": id
+                "id": id,
+                "user_id": user_id
             }
         )
 
@@ -357,11 +399,13 @@ def update_map_unit(id):
 # DELETE DE UNIDADES EN MAPA
 @app.route("/map-units/<int:id>", methods=["DELETE"])
 def delete_map_unit(id):
+    user_id = request.args.get("user_id")
+
     with get_session() as session:
 
         session.execute(
-            text("DELETE FROM map_units WHERE id = :id"),
-            {"id": id}
+            text("DELETE FROM map_units WHERE id = :id AND user_id = :user_id"),
+            {"id": id, "user_id": user_id}
         )
 
         return jsonify({"message": "deleted"})
