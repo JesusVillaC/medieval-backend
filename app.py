@@ -3,8 +3,13 @@ from flask_cors import CORS
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
+
+"""
+ESTO ES PARA DEBUGUEAR EN LOCAL USANDO EL .ENV
+
 from dotenv import load_dotenv
 load_dotenv()
+"""
 
 # PARA CERRAR LAS PUTAS SESIONES Y QUE NO SE SATURE LA BD
 @contextmanager
